@@ -1,0 +1,75 @@
+name: AWS Security Audit
+
+on:
+  schedule:
+    # Daily at 14:00 UTC (09:00 CT)
+    - cron: "0 14 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required for OIDC -> AssumeRoleWithWebIdentity
+  contents: read
+
+env:
+  LOOKBACK_HOURS: 24
+  STALE_DAYS: 90
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::515517431319:role/github-actions-aws-security-audit
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Install jq
+        run: sudo apt-get update -y && sudo apt-get install -y jq
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Create findings directory
+        run: mkdir -p findings
+
+      - name: Run audit scripts
+        run: |
+          set +e
+          overall_status=0
+          for script in scripts/[0-9]*.sh; do
+            name="$(basename "$script" .sh)"
+            echo "::group::Running $name"
+            bash "$script" | tee "findings/${name}.txt"
+            echo "::endgroup::"
+          done
+
+      - name: Check for actionable findings
+        id: check
+        run: |
+          fail=0
+          for f in findings/*.txt; do
+            if grep -q "ISSUE" "$f"; then
+              echo "Actionable findings in $f"
+              fail=1
+            fi
+          done
+          echo "fail=$fail" >> "$GITHUB_OUTPUT"
+
+      - name: Upload findings artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-security-findings-${{ github.run_id }}
+          path: findings/
+          retention-days: 90
+
+      - name: Fail job if actionable findings exist
+        if: steps.check.outputs.fail == '1'
+        run: |
+          echo "One or more audit scripts reported actionable findings. See the uploaded artifact."
+          exit 1
