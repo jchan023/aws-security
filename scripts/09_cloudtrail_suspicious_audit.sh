@@ -27,15 +27,23 @@ for event_name in $watch_events; do
   done <<< "$events"
 done
 
-# Root account usage is always worth a flag regardless of what it did.
+# Root account usage is worth a flag, but only for mutating (write) calls —
+# read-only root activity (ListPolicies, GetAccountSummary, etc.) is normal
+# during account setup/administration and would otherwise drown the signal.
 root_events="$(aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=Username,AttributeValue=root \
   --start-time "$start_time" \
-  --query 'Events[].[EventTime,EventName]' --output text 2>/dev/null)"
+  --query 'Events[].CloudTrailEvent' --output json 2>/dev/null | jq -c '.[]')"
 if [[ -n "$root_events" ]]; then
-  while IFS=$'\t' read -r event_time event_name; do
-    [[ -z "$event_time" ]] && continue
-    echo "ISSUE: [$event_time] ROOT account activity: '$event_name'"
+  while IFS= read -r raw_event; do
+    [[ -z "$raw_event" ]] && continue
+    parsed="$(echo "$raw_event" | jq -r '. | fromjson? // empty')"
+    [[ -z "$parsed" ]] && continue
+    is_readonly="$(echo "$parsed" | jq -r 'if .readOnly == null then "true" else (.readOnly | tostring) end')"
+    [[ "$is_readonly" == "true" ]] && continue
+    event_time="$(echo "$parsed" | jq -r '.eventTime')"
+    event_name="$(echo "$parsed" | jq -r '.eventName')"
+    echo "ISSUE: [$event_time] ROOT account WRITE activity: '$event_name'"
     found=1
   done <<< "$root_events"
 fi
