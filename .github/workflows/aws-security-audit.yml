@@ -22,6 +22,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug OIDC token claims
+        run: |
+          JWT=$(curl -sSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+          PAYLOAD=$(echo "$JWT" | cut -d. -f2 | tr '_-' '/+')
+          case $(( ${#PAYLOAD} % 4 )) in
+            2) PAYLOAD="${PAYLOAD}==" ;;
+            3) PAYLOAD="${PAYLOAD}=" ;;
+          esac
+          echo "$PAYLOAD" | base64 -d | jq '{iss, aud, sub, repository, ref, repository_owner}'
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
