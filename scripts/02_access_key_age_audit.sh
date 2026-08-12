@@ -14,6 +14,8 @@ found=0
 for user in $users; do
   keys_json="$(aws iam list-access-keys --user-name "$user" --query 'AccessKeyMetadata' --output json)"
   count="$(echo "$keys_json" | jq 'length')"
+  [[ "$count" -eq 0 ]] && continue
+
   for i in $(seq 0 $((count - 1))); do
     key_id="$(echo "$keys_json" | jq -r ".[$i].AccessKeyId")"
     status="$(echo "$keys_json" | jq -r ".[$i].Status")"

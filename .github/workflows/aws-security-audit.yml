@@ -22,6 +22,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Restores the finding-history file from the previous run so the email
+      # can tell new findings from ones already open (with a first-seen
+      # date). Key always misses (run_id is unique) so restore-keys falls
+      # back to the most recent prior save; this run's updated history is
+      # saved explicitly at the very end of the job (see the last step),
+      # using the split restore/save actions rather than the combined
+      # action's automatic post-run save - that save is gated by success(),
+      # and a failed run (e.g. a script erroring, or the email failing to
+      # send) should still persist whatever history was gathered.
+      # Can't commit this file to the repo instead - it's public, and the
+      # history would leak account IDs, resource names, and misconfiguration
+      # details.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .findings-history
+          key: findings-history-${{ github.run_id }}
+          restore-keys: |
+            findings-history-
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -34,31 +53,21 @@ jobs:
       - name: Make scripts executable
         run: chmod +x scripts/*.sh
 
-      - name: Create findings directory
-        run: mkdir -p findings
-
       - name: Run audit scripts
         run: |
-          set +e
-          overall_status=0
+          # -e: a genuine script error (not "found something" - the audit
+          # scripts always exit 0 for that, findings are just ISSUE: lines
+          # in the output) should fail this step, and therefore the job.
+          # Findings alone no longer fail the run - see the summary step
+          # below.
+          set -euo pipefail
+          mkdir -p findings
           for script in scripts/[0-9]*.sh; do
             name="$(basename "$script" .sh)"
             echo "::group::Running $name"
             bash "$script" | tee "findings/${name}.txt"
             echo "::endgroup::"
           done
-
-      - name: Check for actionable findings
-        id: check
-        run: |
-          fail=0
-          for f in findings/*.txt; do
-            if grep -q "ISSUE" "$f"; then
-              echo "Actionable findings in $f"
-              fail=1
-            fi
-          done
-          echo "fail=$fail" >> "$GITHUB_OUTPUT"
 
       - name: Upload findings artifact
         if: always()
@@ -72,28 +81,25 @@ jobs:
         if: always()
         id: summary
         run: |
-          COUNT=$(grep -l "ISSUE" findings/*.txt 2>/dev/null | wc -l | tr -d ' ')
-          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          REPORT=$(python3 .github/scripts/build_email_report.py)
           {
             echo "body<<EMAIL_BODY_EOF"
-            echo "AWS Security Audit — $COUNT check(s) with findings — $(date -u +%Y-%m-%d)"
+            echo "AWS Security Audit — $(date -u +%Y-%m-%d)"
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo
-            for f in findings/*.txt; do
-              echo "== $(basename "$f" .txt) =="
-              cat "$f"
-              echo
-            done
+            echo "$REPORT"
             echo "EMAIL_BODY_EOF"
           } >> "$GITHUB_OUTPUT"
 
       # Sends every run regardless of pass/fail, so a clean day still confirms
       # the audit actually ran - not just silence when there's nothing to flag.
       # Requires MAIL_USERNAME/MAIL_PASSWORD repo secrets (a Gmail address +
-      # app password, not the account password - see README).
+      # app password, not the account password - see README). This step is
+      # NOT continue-on-error: findings alone don't fail the run anymore
+      # (see below), but a failed send does - that's the point of emailing
+      # findings at all, so it needs to be a real failure signal.
       - name: Email findings
         if: always()
-        continue-on-error: true # a missing/misconfigured mail secret shouldn't block the audit's own pass/fail signal below
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -102,11 +108,30 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           from: AWS Security Audit <${{ secrets.MAIL_USERNAME }}>
           to: jchan023@gmail.com
-          subject: "AWS Security Audit: ${{ steps.summary.outputs.count }} check(s) flagged — run #${{ github.run_number }}"
+          subject: "AWS Security Audit: ${{ steps.summary.outputs.new_count }} new, ${{ steps.summary.outputs.existing_count }} existing — run #${{ github.run_number }}"
           body: ${{ steps.summary.outputs.body }}
 
-      - name: Fail job if actionable findings exist
-        if: steps.check.outputs.fail == '1'
+      # Informational only - does not fail the run. Findings are expected
+      # (e.g. this account's admin user legitimately having
+      # AdministratorAccess) and are already reported via email above; this
+      # job's pass/fail reflects whether the audits and the email actually
+      # ran, not whether anything was found.
+      - name: Findings summary
+        if: always()
         run: |
-          echo "One or more audit scripts reported actionable findings. See the uploaded artifact."
-          exit 1
+          COUNT=$(grep -l "ISSUE" findings/*.txt 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::notice::$COUNT check(s) have findings - see the email or the uploaded 'aws-security-findings' artifact"
+          else
+            echo "All clear."
+          fi
+
+      # Explicit save, not the combined action's automatic post-run save -
+      # that's gated by success() and would never fire on a failed run. This
+      # standalone step with if: always() saves unconditionally regardless
+      # of job outcome. Must be the LAST step in the job.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .findings-history
+          key: findings-history-${{ github.run_id }}

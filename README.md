@@ -24,8 +24,15 @@ adapted to AWS services.
 Each script prints `ISSUE: ...` lines for anything actionable, or a `No
 issues found` line if clean. The GitHub Actions workflow captures each
 script's output to `findings/<script-name>.txt`, uploads them as a build
-artifact (90-day retention), and fails the job if any file contains an
-`ISSUE` line.
+artifact (90-day retention), and emails a categorized findings summary every
+run (see below) — so new findings and drift show up without anyone having
+to remember to check.
+
+The run's pass/fail status reflects whether it actually *ran* — not whether
+anything was found. Findings are expected (e.g. this account's admin user
+legitimately having `AdministratorAccess`), and are already surfaced via
+email; a green run means the audits executed and the email sent, a red run
+means one of those two things failed to happen.
 
 ## Setup
 
@@ -61,11 +68,36 @@ git push -u origin main
 - Or trigger it manually: GitHub repo → **Actions** tab → **AWS Security
   Audit** workflow → **Run workflow**.
 
-Every run also emails a findings summary (subject line includes the flagged
-check count, body lists every finding) so a run and its results are visible
-without opening GitHub — set these two repo secrets to enable it (GitHub
-repo → **Settings** → **Secrets and variables** → **Actions** → **New
-repository secret**):
+Every run also emails a categorized findings summary so a run and its
+results are visible without opening GitHub. The body is split into three
+sections:
+
+- **New Findings** — `ISSUE:` lines not seen in any prior run
+- **Existing Findings** — `ISSUE:` lines seen before, with the date first
+  observed
+- **All Clear** — checks that came back clean
+
+(Unlike `gcp-security`, there's no separate "Drift" section — none of the
+AWS checks represent ongoing policy state the way `org_policy_audit.sh`
+does for GCP; every check here is a point-in-time finding, so New/Existing
+covers it.)
+
+New-vs-existing tracking needs a history file that survives across runs.
+That can't be committed to the repo (findings history — account IDs,
+resource names, misconfiguration details — would then be public, since this
+repo is), so it's kept in a [GitHub Actions
+cache](https://docs.github.com/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows)
+instead ([`.github/scripts/build_email_report.py`](.github/scripts/build_email_report.py)
+builds it). A finding that disappears and later comes back is treated as
+new again, not resurrected with its old first-seen date. Only `ISSUE:`
+lines are tracked — header lines (`=== ... ===`), section dividers
+(`--- ... ---`), and informational `NOTE:` lines (e.g. a region where
+GuardDuty/Security Hub isn't enabled) are filtered out, so they don't show
+up as permanent phantom findings.
+
+Set these two repo secrets to enable the email step (GitHub repo →
+**Settings** → **Secrets and variables** → **Actions** → **New repository
+secret**):
 
 - `MAIL_USERNAME` — a Gmail address to send from
 - `MAIL_PASSWORD` — a Gmail [App
@@ -74,9 +106,9 @@ repository secret**):
   generate one)
 
 The recipient address is hardcoded to `jchan023@gmail.com` in the workflow —
-change it there if needed. If these two secrets aren't set, the email step
-fails but doesn't block the rest of the run (findings still show up in the
-Actions log and the uploaded artifact either way).
+change it there if needed. Unlike findings (which no longer fail the run),
+a failed email send **does** fail the job — that's the point of emailing
+findings at all, so it needs to be a real failure signal.
 
 ## Running locally
 
@@ -110,3 +142,8 @@ done
 - The `SecurityAudit` managed policy is intentionally broad-but-read-only.
   If you want to scope it down further, most checks above only need IAM,
   S3, EC2, RDS, CloudTrail, GuardDuty, and Security Hub read permissions.
+- The workflow's "Run audit scripts" step runs with `set -euo pipefail`, so
+  a genuine bug in one script (not just findings — those always exit 0)
+  aborts the remaining scripts for that run rather than silently
+  continuing. The email/artifact still reflect whatever ran before the
+  failure; the next day's run isn't affected.
