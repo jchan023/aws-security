@@ -20,6 +20,7 @@ adapted to AWS services.
 | `08_stale_resources_audit.sh` | **The "hasn't been used in 90 days" check** — inactive IAM users/roles, unattached EBS volumes, unassociated Elastic IPs, long-stopped EC2 instances |
 | `09_cloudtrail_suspicious_audit.sh` | Privilege-escalation-shaped events, root account usage, anti-forensics activity (disabled logging, deleted trails) in the last `LOOKBACK_HOURS` |
 | `10_securityhub_guardduty_audit.sh` | Aggregates active CRITICAL/HIGH Security Hub and GuardDuty findings across regions |
+| `11_account_baseline_audit.sh` | **Account-level security baseline drift** — IAM password policy, S3 account-wide Block Public Access, EBS encryption by default, multi-region CloudTrail with log file validation, AWS Config recording |
 
 Each script prints `ISSUE: ...` lines for anything actionable, or a `No
 issues found` line if clean. The GitHub Actions workflow captures each
@@ -69,18 +70,19 @@ git push -u origin main
   Audit** workflow → **Run workflow**.
 
 Every run also emails a categorized findings summary so a run and its
-results are visible without opening GitHub. The body is split into three
+results are visible without opening GitHub. The body is split into four
 sections:
 
 - **New Findings** — `ISSUE:` lines not seen in any prior run
 - **Existing Findings** — `ISSUE:` lines seen before, with the date first
   observed
+- **Drift** — [`11_account_baseline_audit.sh`](scripts/11_account_baseline_audit.sh)'s
+  output specifically (account-level security settings, shown as-is every
+  run rather than new/existing-tracked, same as `gcp-security`'s
+  `org_policy_audit.sh` handling — this is ongoing configuration posture,
+  not a one-off event, so you want to see it every day it's still true, not
+  just once)
 - **All Clear** — checks that came back clean
-
-(Unlike `gcp-security`, there's no separate "Drift" section — none of the
-AWS checks represent ongoing policy state the way `org_policy_audit.sh`
-does for GCP; every check here is a point-in-time finding, so New/Existing
-covers it.)
 
 New-vs-existing tracking needs a history file that survives across runs.
 That can't be committed to the repo (findings history — account IDs,
@@ -89,8 +91,9 @@ repo is), so it's kept in a [GitHub Actions
 cache](https://docs.github.com/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows)
 instead ([`.github/scripts/build_email_report.py`](.github/scripts/build_email_report.py)
 builds it). A finding that disappears and later comes back is treated as
-new again, not resurrected with its old first-seen date. Only `ISSUE:`
-lines are tracked — header lines (`=== ... ===`), section dividers
+new again, not resurrected with its old first-seen date. Only `ISSUE`
+lines are tracked (both the `ISSUE: ...` and `ISSUE [region]: ...` formats
+scripts use) — header lines (`=== ... ===`), section dividers
 (`--- ... ---`), and informational `NOTE:` lines (e.g. a region where
 GuardDuty/Security Hub isn't enabled) are filtered out, so they don't show
 up as permanent phantom findings.
@@ -131,10 +134,13 @@ done
 
 ## Notes
 
-- `05_public_security_group_audit.sh`, `06`–`07`, and `08` (partially) loop
-  over **every enabled AWS region** — this can take a few minutes on an
-  account with many regions enabled. Consider narrowing to specific
-  regions via an env var if that becomes slow.
+- `05_public_security_group_audit.sh`, `06`–`07`, `08` (partially), and `11`
+  (EBS encryption + AWS Config checks) loop over **every enabled AWS
+  region** — this can take a few minutes on an account with many regions
+  enabled. Consider narrowing to specific regions via an env var if that
+  becomes slow. These are all free read-only `describe`/`get` calls, unlike
+  actually enabling GuardDuty/Security Hub (see below), so looping every
+  region costs nothing.
 - `10_securityhub_guardduty_audit.sh` only reports findings in regions
   where Security Hub / GuardDuty are enabled; it notes (not flags) regions
   where they're off, since enabling them account/org-wide is a separate
