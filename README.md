@@ -134,13 +134,16 @@ done
 
 ## Notes
 
-- `05_public_security_group_audit.sh`, `06`–`07`, `08` (partially), and `11`
-  (EBS encryption + AWS Config checks) loop over **every enabled AWS
-  region** — this can take a few minutes on an account with many regions
-  enabled. Consider narrowing to specific regions via an env var if that
-  becomes slow. These are all free read-only `describe`/`get` calls, unlike
-  actually enabling GuardDuty/Security Hub (see below), so looping every
-  region costs nothing.
+- `05_public_security_group_audit.sh`, `06`–`07`, `08` (partially), `10`,
+  and `11` (EBS encryption + AWS Config checks) loop over regions via
+  `regions_to_scan()` in `scripts/lib.sh`, which defaults to just
+  `AWS_DEFAULT_REGION` (a single region) rather than every enabled region —
+  no point burning a few minutes scanning ~17 regions for resources that
+  only ever exist in one. Set `AWS_REGIONS` to a space-separated list (e.g.
+  `"us-east-1 us-west-2"`) to widen it once you actually use more than one
+  region. These are all free read-only `describe`/`get` calls, unlike
+  actually enabling GuardDuty/Security Hub (see below), so widening this
+  costs nothing extra to run — it just takes longer.
 - `10_securityhub_guardduty_audit.sh` only reports findings in regions
   where Security Hub / GuardDuty are enabled; it notes (not flags) regions
   where they're off, since enabling them account/org-wide is a separate

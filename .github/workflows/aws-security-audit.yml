@@ -14,6 +14,12 @@ env:
   LOOKBACK_HOURS: 24
   STALE_DAYS: 90
   AWS_DEFAULT_REGION: us-east-1
+  # Region-looping checks (05, 06, 07, 08, 10, 11) scan just this region by
+  # default (regions_to_scan() in scripts/lib.sh falls back to
+  # AWS_DEFAULT_REGION above). Set AWS_REGIONS to a space-separated list
+  # here to widen it, e.g. "us-east-1 us-west-2", once resources exist
+  # outside this one region.
+  # AWS_REGIONS: "us-east-1 us-west-2"
 
 jobs:
   audit:

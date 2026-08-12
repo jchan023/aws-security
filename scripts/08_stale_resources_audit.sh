@@ -80,7 +80,7 @@ for role in $(aws iam list-roles --query 'Roles[].RoleName' --output text); do
   fi
 done
 
-regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
+regions="$(regions_to_scan)"
 
 # --- Unattached EBS volumes ---
 echo "--- Unattached EBS volumes ---"

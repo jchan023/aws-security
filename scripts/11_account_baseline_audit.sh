@@ -50,7 +50,7 @@ else
   fi
 fi
 
-regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
+regions="$(regions_to_scan)"
 
 # --- EBS encryption by default, per region ---
 for region in $regions; do

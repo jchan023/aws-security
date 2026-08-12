@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib.sh"
 echo "=== Public RDS Audit ==="
 found=0
 
-regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
+regions="$(regions_to_scan)"
 
 for region in $regions; do
   public_instances="$(aws rds describe-db-instances --region "$region" \

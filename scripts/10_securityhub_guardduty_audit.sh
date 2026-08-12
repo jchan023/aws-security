@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/lib.sh"
 
 echo "=== Security Hub / GuardDuty Findings Audit ==="
 found=0
-regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
+regions="$(regions_to_scan)"
 
 for region in $regions; do
   hub_status="$(aws securityhub describe-hub --region "$region" --query 'HubArn' --output text 2>/dev/null)"
