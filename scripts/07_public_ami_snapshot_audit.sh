@@ -7,7 +7,7 @@ source "$SCRIPT_DIR/lib.sh"
 echo "=== Public AMI / EBS Snapshot Audit ==="
 found=0
 
-regions="$(regions_to_scan)"
+regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
 account_id="$(aws sts get-caller-identity --query 'Account' --output text)"
 
 for region in $regions; do

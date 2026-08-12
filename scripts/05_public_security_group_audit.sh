@@ -11,7 +11,7 @@ found=0
 
 sensitive_ports="22 3389 3306 5432 1433 27017 6379 9200 5984 11211"
 
-regions="$(regions_to_scan)"
+regions="$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)"
 
 for region in $regions; do
   sgs_json="$(aws ec2 describe-security-groups --region "$region" --query 'SecurityGroups' --output json 2>/dev/null)"

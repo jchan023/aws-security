@@ -134,16 +134,24 @@ done
 
 ## Notes
 
-- `05_public_security_group_audit.sh`, `06`–`07`, `08` (partially), `10`,
-  and `11` (EBS encryption + AWS Config checks) loop over regions via
-  `regions_to_scan()` in `scripts/lib.sh`, which defaults to just
-  `AWS_DEFAULT_REGION` (a single region) rather than every enabled region —
-  no point burning a few minutes scanning ~17 regions for resources that
-  only ever exist in one. Set `AWS_REGIONS` to a space-separated list (e.g.
-  `"us-east-1 us-west-2"`) to widen it once you actually use more than one
-  region. These are all free read-only `describe`/`get` calls, unlike
-  actually enabling GuardDuty/Security Hub (see below), so widening this
-  costs nothing extra to run — it just takes longer.
+- Region scoping is intentionally split into two groups, because "skip a
+  region" means something different for each:
+  - `05_public_security_group_audit.sh`, `06`–`07`, and `08` (partially) —
+    security groups, RDS, AMIs/snapshots, stale resources — look for
+    *actual resources*, so they always scan **every enabled AWS region**
+    via `aws ec2 describe-regions` directly, unconditionally. Skipping a
+    region here would mean silently missing a real misconfigured resource
+    the moment you deploy somewhere new. They're already cheap and silent
+    when a region has nothing in it, so full coverage costs nothing extra.
+  - `10_securityhub_guardduty_audit.sh` and `11_account_baseline_audit.sh`
+    (EBS encryption + AWS Config) check *account/region settings*, not
+    resources — every enabled region always reports some status regardless
+    of whether you use it, so scanning all ~17 is pure noise. These two use
+    `regions_to_scan()` in `scripts/lib.sh`, which defaults to just
+    `AWS_DEFAULT_REGION`. Set `AWS_REGIONS` to a space-separated list (e.g.
+    `"us-east-1 us-west-2"`) to widen it once you operate in more than one
+    region — these are still free read-only calls, so widening costs
+    nothing but time.
 - `10_securityhub_guardduty_audit.sh` only reports findings in regions
   where Security Hub / GuardDuty are enabled; it notes (not flags) regions
   where they're off, since enabling them account/org-wide is a separate
