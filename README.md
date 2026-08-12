@@ -61,6 +61,23 @@ git push -u origin main
 - Or trigger it manually: GitHub repo → **Actions** tab → **AWS Security
   Audit** workflow → **Run workflow**.
 
+Every run also emails a findings summary (subject line includes the flagged
+check count, body lists every finding) so a run and its results are visible
+without opening GitHub — set these two repo secrets to enable it (GitHub
+repo → **Settings** → **Secrets and variables** → **Actions** → **New
+repository secret**):
+
+- `MAIL_USERNAME` — a Gmail address to send from
+- `MAIL_PASSWORD` — a Gmail [App
+  Password](https://myaccount.google.com/apppasswords) for that address, **not**
+  the account password (Google requires 2-Step Verification to be enabled to
+  generate one)
+
+The recipient address is hardcoded to `jchan023@gmail.com` in the workflow —
+change it there if needed. If these two secrets aren't set, the email step
+fails but doesn't block the rest of the run (findings still show up in the
+Actions log and the uploaded artifact either way).
+
 ## Running locally
 
 Requires the AWS CLI (configured with credentials for the target account)

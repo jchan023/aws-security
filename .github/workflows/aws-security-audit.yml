@@ -68,6 +68,43 @@ jobs:
           path: findings/
           retention-days: 90
 
+      - name: Build email summary
+        if: always()
+        id: summary
+        run: |
+          COUNT=$(grep -l "ISSUE" findings/*.txt 2>/dev/null | wc -l | tr -d ' ')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<EMAIL_BODY_EOF"
+            echo "AWS Security Audit — $COUNT check(s) with findings — $(date -u +%Y-%m-%d)"
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            for f in findings/*.txt; do
+              echo "== $(basename "$f" .txt) =="
+              cat "$f"
+              echo
+            done
+            echo "EMAIL_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Sends every run regardless of pass/fail, so a clean day still confirms
+      # the audit actually ran - not just silence when there's nothing to flag.
+      # Requires MAIL_USERNAME/MAIL_PASSWORD repo secrets (a Gmail address +
+      # app password, not the account password - see README).
+      - name: Email findings
+        if: always()
+        continue-on-error: true # a missing/misconfigured mail secret shouldn't block the audit's own pass/fail signal below
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: AWS Security Audit <${{ secrets.MAIL_USERNAME }}>
+          to: jchan023@gmail.com
+          subject: "AWS Security Audit: ${{ steps.summary.outputs.count }} check(s) flagged — run #${{ github.run_number }}"
+          body: ${{ steps.summary.outputs.body }}
+
       - name: Fail job if actionable findings exist
         if: steps.check.outputs.fail == '1'
         run: |
