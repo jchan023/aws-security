@@ -1,2 +1,3 @@
 findings/*.txt
 .findings-history/
+__pycache__/
