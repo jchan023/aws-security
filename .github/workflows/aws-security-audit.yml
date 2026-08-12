@@ -108,7 +108,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           from: AWS Security Audit <${{ secrets.MAIL_USERNAME }}>
           to: jchan023@gmail.com
-          subject: "AWS Security Audit: ${{ steps.summary.outputs.new_count }} new, ${{ steps.summary.outputs.existing_count }} existing — run #${{ github.run_number }}"
+          subject: "AWS Security Audit: ${{ steps.summary.outputs.new_count }} new, ${{ steps.summary.outputs.existing_count }} existing, ${{ steps.summary.outputs.drift_count }} drift — run #${{ github.run_number }}"
           body: ${{ steps.summary.outputs.body }}
 
       # Informational only - does not fail the run. Findings are expected
