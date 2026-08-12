@@ -33,7 +33,11 @@ artifact (90-day retention), and fails the job if any file contains an
 
 - OIDC identity provider for `token.actions.githubusercontent.com` added in IAM.
 - IAM role `github-actions-aws-security-audit` trusted only for
-  `repo:jchan023/aws-security:*`, with the AWS managed `SecurityAudit`
+  `repo:jchan023@7191761/aws-security@1329980626:*` (GitHub's newer OIDC
+  claim format embeds immutable owner/repo IDs after each name, e.g.
+  `owner@ownerId/repo@repoId`, to prevent takeover via repo
+  rename/transfer — decode a token's `sub` claim in CI to see this if
+  you ever need to re-verify it), with the AWS managed `SecurityAudit`
   policy attached (read-only across IAM, S3, EC2, RDS, CloudTrail,
   GuardDuty, Security Hub, etc. — no write access).
 - Role ARN is referenced directly in
