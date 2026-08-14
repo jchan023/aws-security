@@ -1,7 +1,7 @@
 # aws-security
 
-Read-only security audit toolkit for an AWS account, run daily via GitHub
-Actions. This is the AWS counterpart to
+Read-only security audit toolkit for an AWS account, run weekly (Thursdays)
+via GitHub Actions. This is the AWS counterpart to
 [`gcp-security`](https://github.com/jchan023/gcp-security) — same approach
 (bash + CLI + `jq`, OIDC auth from CI, findings uploaded as build artifacts),
 adapted to AWS services.
@@ -65,7 +65,7 @@ git push -u origin main
 
 ### 3. Run it
 
-- It runs automatically every day at 14:00 UTC.
+- It runs automatically every Thursday at 14:00 UTC.
 - Or trigger it manually: GitHub repo → **Actions** tab → **AWS Security
   Audit** workflow → **Run workflow**.
 

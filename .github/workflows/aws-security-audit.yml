@@ -2,8 +2,8 @@ name: AWS Security Audit
 
 on:
   schedule:
-    # Daily at 14:00 UTC (09:00 CT)
-    - cron: "0 14 * * *"
+    # Weekly on Thursdays at 14:00 UTC (09:00 CT)
+    - cron: "0 14 * * 4"
   workflow_dispatch: {}
 
 permissions:
@@ -11,7 +11,11 @@ permissions:
   contents: read
 
 env:
-  LOOKBACK_HOURS: 24
+  # 168h = 7 days, matching the weekly cadence above so
+  # 09_cloudtrail_suspicious_audit.sh doesn't leave a gap between runs. If
+  # you change the schedule, change this to match or you'll miss activity
+  # between runs.
+  LOOKBACK_HOURS: 168
   STALE_DAYS: 90
   AWS_DEFAULT_REGION: us-east-1
   # Region-looping checks (05, 06, 07, 08, 10, 11) scan just this region by
