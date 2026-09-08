@@ -1,0 +1,38 @@
+[
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "Amazon Inspector EC2 scanning should be enabled",
+    "reason": "No EC2 instances exist in this account. Inspector EC2 scanning has nothing to scan and would add ongoing cost with zero benefit. Revisit once EC2 is actually used.",
+    "accepted_date": "2026-09-03"
+  },
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "Amazon Inspector ECR scanning should be enabled",
+    "reason": "No ECR repositories exist in this account. Revisit once ECR is actually used.",
+    "accepted_date": "2026-09-03"
+  },
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "Amazon Inspector Lambda standard scanning should be enabled",
+    "reason": "No Lambda functions exist in this account. Revisit once Lambda is actually used.",
+    "accepted_date": "2026-09-03"
+  },
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "Amazon Inspector Lambda code scanning should be enabled",
+    "reason": "No Lambda functions exist in this account. Revisit once Lambda is actually used.",
+    "accepted_date": "2026-09-03"
+  },
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "GuardDuty EKS Runtime Monitoring should be enabled",
+    "reason": "No EKS clusters exist in this account. Revisit once EKS is actually used.",
+    "accepted_date": "2026-09-03"
+  },
+  {
+    "check": "10_securityhub_guardduty_audit",
+    "match": "GuardDuty Runtime Monitoring should be enabled",
+    "reason": "No EC2/ECS/EKS workloads exist for GuardDuty Runtime Monitoring to protect. Revisit once any of those are actually used.",
+    "accepted_date": "2026-09-03"
+  }
+]

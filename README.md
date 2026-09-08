@@ -70,7 +70,7 @@ git push -u origin main
   Audit** workflow → **Run workflow**.
 
 Every run also emails a categorized findings summary so a run and its
-results are visible without opening GitHub. The body is split into four
+results are visible without opening GitHub. The body is split into five
 sections:
 
 - **New Findings** — `ISSUE:` lines not seen in any prior run
@@ -82,7 +82,40 @@ sections:
   `org_policy_audit.sh` handling — this is ongoing configuration posture,
   not a one-off event, so you want to see it every day it's still true, not
   just once)
+- **Accepted Risk** — findings matched against
+  [`accepted-findings.json`](accepted-findings.json) (see below) — real
+  findings that are deliberately not being acted on right now, with a
+  written reason, kept visible rather than disappearing
 - **All Clear** — checks that came back clean
+
+### Accepting a finding as risk
+
+Not every real finding needs action immediately — e.g. Security Hub
+recommending Inspector scanning for EC2 when this account has no EC2
+instances is technically true but not worth enabling (it'd add ongoing
+cost to scan nothing). Rather than letting these sit in New/Existing
+forever (alert fatigue) or silently deleting them (no audit trail), add an
+entry to `accepted-findings.json`:
+
+```json
+{
+  "check": "10_securityhub_guardduty_audit",
+  "match": "Amazon Inspector EC2 scanning should be enabled",
+  "reason": "No EC2 instances exist in this account. Revisit once EC2 is actually used.",
+  "accepted_date": "2026-09-03"
+}
+```
+
+`check` must match the script name exactly (the `findings/<check>.txt`
+filename minus `.txt`); `match` is a substring checked against each
+`ISSUE` line for that check — keep it specific enough that it won't
+accidentally swallow an unrelated finding from the same script, but not so
+specific (e.g. including a region or resource ID) that a trivial change to
+the underlying finding stops matching it. A file whose findings are *all*
+accepted still doesn't count as All Clear — the decision stays visible in
+the Accepted Risk section every run, not just once. This file is committed
+to the repo (not gitignored) since these are deliberate, reviewable
+decisions, unlike the findings-history cache below.
 
 New-vs-existing tracking needs a history file that survives across runs.
 That can't be committed to the repo (findings history — account IDs,
