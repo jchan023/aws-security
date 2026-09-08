@@ -1,5 +1,11 @@
 [
   {
+    "check": "03_privileged_iam_audit",
+    "match": "user 'jchan023-admin' has AdministratorAccess attached directly",
+    "reason": "jchan023-admin is the intentional working admin account for this account - AdministratorAccess is expected, not a misconfiguration. Scoped to this specific username so a different user later getting AdministratorAccess would still be flagged as new.",
+    "accepted_date": "2026-09-08"
+  },
+  {
     "check": "10_securityhub_guardduty_audit",
     "match": "Amazon Inspector EC2 scanning should be enabled",
     "reason": "No EC2 instances exist in this account. Inspector EC2 scanning has nothing to scan and would add ongoing cost with zero benefit. Revisit once EC2 is actually used.",
